@@ -22,7 +22,7 @@ async function getTenantAccessToken() {
     tenantAccessToken = resp.data.tenant_access_token;
     return tenantAccessToken;
   }
-  throw new Error(`获取 token 失败`);
+  throw new Error('获取 token 失败');
 }
 
 async function getBaseIdFromWiki() {
@@ -35,7 +35,7 @@ async function getBaseIdFromWiki() {
     baseId = resp.data.data.node.obj_token;
     return baseId;
   }
-  throw new Error(`获取 base_id 失败`);
+  throw new Error('获取 base_id 失败');
 }
 
 async function sendMessage(chatId, text) {
@@ -48,13 +48,14 @@ async function sendMessage(chatId, text) {
     headers: { Authorization: `Bearer ${tenantAccessToken}` }
   });
 }
+
 async function addRecord(fields) {
   const url = `${BASE_URL}/bitable/v1/apps/${baseId}/tables/${CONFIG.TABLE_ID}/records`;
   const resp = await axios.post(url, { fields }, {
     headers: { Authorization: `Bearer ${tenantAccessToken}` }
   });
   if (resp.data.code === 0) return resp.data.data.record;
-  throw new Error(`添加失败`);
+  throw new Error('添加失败');
 }
 
 async function listRecords() {
@@ -82,7 +83,7 @@ async function updateRecord(recordId, fields) {
     headers: { Authorization: `Bearer ${tenantAccessToken}` }
   });
   if (resp.data.code === 0) return resp.data.data.record;
-  throw new Error(`更新失败`);
+  throw new Error('更新失败');
 }
 
 async function deleteRecord(recordId) {
@@ -91,7 +92,7 @@ async function deleteRecord(recordId) {
     headers: { Authorization: `Bearer ${tenantAccessToken}` }
   });
   if (resp.data.code === 0) return true;
-  throw new Error(`删除失败`);
+  throw new Error('删除失败');
 }
 
 function parseDate(dateStr) {
@@ -102,6 +103,7 @@ function parseDate(dateStr) {
   if (/^\d{4}-\d{2}-\d{2}$/.test(dateStr)) return new Date(dateStr).getTime();
   return new Date().getTime();
 }
+
 async function handleMessage(messageText, chatId) {
   const text = messageText.trim();
   
@@ -110,7 +112,6 @@ async function handleMessage(messageText, chatId) {
     await getBaseIdFromWiki();
   }
   
-  // 添加记录
   if (text.startsWith('添加记录') || text.startsWith('新增')) {
     const parts = text.split(/\s+/);
     if (parts.length < 3) return '格式: 添加记录 [日期] [内容]';
@@ -122,7 +123,6 @@ async function handleMessage(messageText, chatId) {
     } catch (e) { return `添加失败: ${e.message}`; }
   }
   
-  // 查询记录
   if (text.startsWith('查询') || text.startsWith('列表')) {
     try {
       const records = await listRecords();
@@ -137,7 +137,6 @@ async function handleMessage(messageText, chatId) {
     } catch (e) { return `查询失败: ${e.message}`; }
   }
   
-  // 更新记录
   if (text.startsWith('更新') || text.startsWith('修改')) {
     const parts = text.split(/\s+/);
     if (parts.length < 4) return '格式: 更新记录 [ID] [字段] [值]';
@@ -155,7 +154,6 @@ async function handleMessage(messageText, chatId) {
     } catch (e) { return `更新失败: ${e.message}`; }
   }
   
-  // 删除记录
   if (text.startsWith('删除')) {
     const parts = text.split(/\s+/);
     if (parts.length < 2) return '格式: 删除记录 [ID]';
@@ -165,7 +163,6 @@ async function handleMessage(messageText, chatId) {
     } catch (e) { return `删除失败: ${e.message}`; }
   }
   
-  // 帮助
   if (text === '帮助' || text === 'help') {
     return `可用指令:\n• 添加记录 [日期] [内容]\n• 查询记录\n• 更新记录 [ID] [字段] [值]\n• 删除记录 [ID]\n\n日期: 今天/昨天/前天/2024-01-01`;
   }
@@ -182,15 +179,20 @@ module.exports = async (req, res) => {
   
   if (req.method === 'POST') {
     const { header, event } = req.body;
+    res.json({ code: 0 });
+    
     if (header?.event_type === 'im.message.receive_v1') {
-      const { message } = event;
-      const chatId = message.chat_id;
-      const content = JSON.parse(message.content);
-      const reply = await handleMessage(content.text || '', chatId);
-      await sendMessage(chatId, reply);
-      return res.json({ code: 0 });
+      try {
+        const { message } = event;
+        const chatId = message.chat_id;
+        const content = JSON.parse(message.content);
+        const reply = await handleMessage(content.text || '', chatId);
+        await sendMessage(chatId, reply);
+      } catch (e) {
+        console.error('处理消息失败:', e);
+      }
     }
-    return res.json({ code: 0 });
+    return;
   }
   
   res.status(405).json({ error: 'Method not allowed' });
