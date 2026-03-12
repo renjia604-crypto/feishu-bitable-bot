@@ -48,3 +48,57 @@ async function sendMessage(chatId, text) {
     headers: { Authorization: `Bearer ${tenantAccessToken}` }
   });
 }
+async function addRecord(fields) {
+  const url = `${BASE_URL}/bitable/v1/apps/${baseId}/tables/${CONFIG.TABLE_ID}/records`;
+  const resp = await axios.post(url, { fields }, {
+    headers: { Authorization: `Bearer ${tenantAccessToken}` }
+  });
+  if (resp.data.code === 0) return resp.data.data.record;
+  throw new Error(`添加失败`);
+}
+
+async function listRecords() {
+  const url = `${BASE_URL}/bitable/v1/apps/${baseId}/tables/${CONFIG.TABLE_ID}/records`;
+  const allRecords = [];
+  let pageToken = null;
+  do {
+    const params = { page_size: 500 };
+    if (pageToken) params.page_token = pageToken;
+    const resp = await axios.get(url, {
+      params, headers: { Authorization: `Bearer ${tenantAccessToken}` }
+    });
+    if (resp.data.code === 0) {
+      allRecords.push(...resp.data.data.items);
+      pageToken = resp.data.data.page_token;
+      if (!resp.data.data.has_more) break;
+    }
+  } while (pageToken);
+  return allRecords;
+}
+
+async function updateRecord(recordId, fields) {
+  const url = `${BASE_URL}/bitable/v1/apps/${baseId}/tables/${CONFIG.TABLE_ID}/records/${recordId}`;
+  const resp = await axios.put(url, { fields }, {
+    headers: { Authorization: `Bearer ${tenantAccessToken}` }
+  });
+  if (resp.data.code === 0) return resp.data.data.record;
+  throw new Error(`更新失败`);
+}
+
+async function deleteRecord(recordId) {
+  const url = `${BASE_URL}/bitable/v1/apps/${baseId}/tables/${CONFIG.TABLE_ID}/records/${recordId}`;
+  const resp = await axios.delete(url, {
+    headers: { Authorization: `Bearer ${tenantAccessToken}` }
+  });
+  if (resp.data.code === 0) return true;
+  throw new Error(`删除失败`);
+}
+
+function parseDate(dateStr) {
+  const today = new Date();
+  if (dateStr === '今天') return new Date(today.setHours(0, 0, 0, 0)).getTime();
+  if (dateStr === '昨天') return new Date(today.setDate(today.getDate() - 1)).setHours(0, 0, 0, 0);
+  if (dateStr === '前天') return new Date(today.setDate(today.getDate() - 2)).setHours(0, 0, 0, 0);
+  if (/^\d{4}-\d{2}-\d{2}$/.test(dateStr)) return new Date(dateStr).getTime();
+  return new Date().getTime();
+}
